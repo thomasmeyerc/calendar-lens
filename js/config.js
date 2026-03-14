@@ -11,8 +11,8 @@
 
 const AppConfig = {
     // Supabase project credentials
-    SUPABASE_URL: '', // e.g., 'https://xxxxx.supabase.co'
-    SUPABASE_ANON_KEY: '', // e.g., 'eyJhbGciOi...'
+    SUPABASE_URL: 'https://monqbqkwkmtpnrmkxbje.supabase.co',
+    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vbnFicWt3a210cG5ybWt4YmplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MjE5MDUsImV4cCI6MjA4OTA5NzkwNX0.8kLOf9iNkjqER4NNEdVs0lkPeLnmoa80Q0knvsEjwPE',
 
     // Google Calendar API
     GOOGLE_CALENDAR_SCOPES: [
