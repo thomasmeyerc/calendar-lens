@@ -1,18 +1,18 @@
 /**
  * auth.js — Authentication Module (Supabase + Google OAuth)
  * Handles sign-in, sign-out, session management, and Google access tokens.
+ * Persists Google provider_token in sessionStorage since Supabase only
+ * returns it on the initial OAuth callback.
  */
 
 const Auth = (function () {
     'use strict';
 
+    const TOKEN_KEY = 'calendarlens-google-token';
     let supabase = null;
     let currentUser = null;
     let onAuthChange = null;
 
-    /**
-     * Initialize Supabase client and auth listener.
-     */
     function init(callback) {
         onAuthChange = callback;
 
@@ -30,16 +30,15 @@ const Auth = (function () {
         // Listen for auth state changes
         supabase.auth.onAuthStateChange((event, session) => {
             if (session?.user) {
-                currentUser = {
-                    id: session.user.id,
-                    email: session.user.email,
-                    name: session.user.user_metadata?.full_name || session.user.email,
-                    avatar: session.user.user_metadata?.avatar_url || null,
-                    accessToken: session.provider_token || null,
-                    refreshToken: session.provider_refresh_token || null,
-                };
+                // Capture provider_token on initial sign-in (only available once)
+                if (session.provider_token) {
+                    sessionStorage.setItem(TOKEN_KEY, session.provider_token);
+                }
+
+                currentUser = buildUser(session);
             } else {
                 currentUser = null;
+                sessionStorage.removeItem(TOKEN_KEY);
             }
             if (onAuthChange) onAuthChange(currentUser);
         });
@@ -47,27 +46,26 @@ const Auth = (function () {
         // Check for existing session
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session?.user) {
-                currentUser = {
-                    id: session.user.id,
-                    email: session.user.email,
-                    name: session.user.user_metadata?.full_name || session.user.email,
-                    avatar: session.user.user_metadata?.avatar_url || null,
-                    accessToken: session.provider_token || null,
-                    refreshToken: session.provider_refresh_token || null,
-                };
+                if (session.provider_token) {
+                    sessionStorage.setItem(TOKEN_KEY, session.provider_token);
+                }
+                currentUser = buildUser(session);
             }
             if (onAuthChange) onAuthChange(currentUser);
         });
     }
 
-    /**
-     * Sign in with Google (redirects to Google consent).
-     */
+    function buildUser(session) {
+        return {
+            id: session.user.id,
+            email: session.user.email,
+            name: session.user.user_metadata?.full_name || session.user.email,
+            avatar: session.user.user_metadata?.avatar_url || null,
+        };
+    }
+
     async function signInWithGoogle() {
-        if (!supabase) {
-            console.error('Supabase not initialized');
-            return;
-        }
+        if (!supabase) return;
 
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
@@ -81,39 +79,27 @@ const Auth = (function () {
             },
         });
 
-        if (error) {
-            console.error('Sign-in error:', error.message);
-        }
+        if (error) console.error('Sign-in error:', error.message);
     }
 
-    /**
-     * Sign out.
-     */
     async function signOut() {
         if (!supabase) return;
+        sessionStorage.removeItem(TOKEN_KEY);
         await supabase.auth.signOut();
         currentUser = null;
     }
 
-    /**
-     * Get the current user (or null).
-     */
     function getUser() {
         return currentUser;
     }
 
     /**
-     * Get the Google access token for Calendar API calls.
+     * Get the Google access token — from sessionStorage (persisted on callback).
      */
-    async function getGoogleAccessToken() {
-        if (!supabase) return null;
-        const { data: { session } } = await supabase.auth.getSession();
-        return session?.provider_token || null;
+    function getGoogleAccessToken() {
+        return sessionStorage.getItem(TOKEN_KEY);
     }
 
-    /**
-     * Check if user is authenticated.
-     */
     function isAuthenticated() {
         return currentUser !== null;
     }

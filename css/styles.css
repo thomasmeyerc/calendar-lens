@@ -266,6 +266,135 @@ body {
     color: var(--text-primary);
 }
 
+/* === Calendar Picker Screen === */
+.picker-screen {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 57px);
+    padding: var(--space-xl);
+}
+
+.picker-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 480px;
+    animation: fadeIn 0.4s var(--ease-out);
+}
+
+.picker-hero {
+    text-align: center;
+    margin-bottom: var(--space-xl);
+}
+
+.picker-title {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: var(--space-sm);
+}
+
+.picker-subtitle {
+    font-size: 1rem;
+    color: var(--text-secondary);
+}
+
+.picker-list {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xl);
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.picker-loading {
+    text-align: center;
+    color: var(--text-dim);
+    padding: var(--space-xl);
+}
+
+.picker-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: 14px var(--space-md);
+    background: var(--bg-card);
+    border: 1px solid var(--bg-card-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    user-select: none;
+}
+
+.picker-item:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--accent-border);
+}
+
+.picker-item.selected {
+    border-color: var(--accent);
+    background: var(--accent-bg);
+}
+
+.picker-check {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--bg-card-border);
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all var(--transition-fast);
+}
+
+.picker-item.selected .picker-check {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.picker-check svg {
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.picker-item.selected .picker-check svg {
+    opacity: 1;
+}
+
+.picker-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.picker-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.picker-name {
+    font-weight: 500;
+    font-size: 0.9375rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.picker-primary-badge {
+    font-size: 0.6875rem;
+    color: var(--accent);
+    font-weight: 500;
+    margin-left: var(--space-xs);
+}
+
 /* === Google Sign-In Button === */
 .btn-google {
     display: inline-flex;

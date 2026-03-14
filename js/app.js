@@ -1,6 +1,6 @@
 /**
  * app.js — Main Application Controller
- * Manages auth flow, calendar sync, file uploads, and UI state.
+ * Manages auth flow, calendar picker, calendar sync, file uploads, and UI state.
  */
 
 (function () {
@@ -8,6 +8,7 @@
 
     // === DOM Elements ===
     const authScreen = document.getElementById('auth-screen');
+    const pickerScreen = document.getElementById('picker-screen');
     const uploadScreen = document.getElementById('upload-screen');
     const dashboard = document.getElementById('dashboard');
     const uploadZone = document.getElementById('upload-zone');
@@ -49,38 +50,34 @@
     const dropdownName = document.getElementById('dropdown-name');
     const dropdownEmail = document.getElementById('dropdown-email');
 
+    // Picker
+    const pickerList = document.getElementById('picker-list');
+    const btnPickerAnalyze = document.getElementById('btn-picker-analyze');
+
     // Theme
     const themeToggle = document.getElementById('theme-toggle');
 
     // === State ===
     let isOfflineMode = false;
+    let selectedCalendarIds = [];
 
     // === Initialize ===
     init();
 
     function init() {
-        // Theme first (no flash)
         ThemeManager.init();
-
-        // Auth
         Auth.init(handleAuthChange);
-
-        // Event listeners
         bindEvents();
     }
 
     function bindEvents() {
-        // Theme toggle
         themeToggle.addEventListener('click', ThemeManager.toggle);
 
-        // Auth buttons
         btnGoogleSignin.addEventListener('click', () => Auth.signInWithGoogle());
         btnOfflineMode.addEventListener('click', enterOfflineMode);
         btnBackToAuth.addEventListener('click', showAuthScreen);
 
-        if (navSigninBtn) {
-            navSigninBtn.addEventListener('click', () => Auth.signInWithGoogle());
-        }
+        if (navSigninBtn) navSigninBtn.addEventListener('click', () => Auth.signInWithGoogle());
 
         if (btnSignout) {
             btnSignout.addEventListener('click', async () => {
@@ -89,36 +86,24 @@
             });
         }
 
-        // Nav actions (logged in)
-        if (btnUploadNav) {
-            btnUploadNav.addEventListener('click', () => fileInput.click());
-        }
+        if (btnUploadNav) btnUploadNav.addEventListener('click', () => fileInput.click());
+        if (btnSyncNav) btnSyncNav.addEventListener('click', () => showPickerScreen());
 
-        if (btnSyncNav) {
-            btnSyncNav.addEventListener('click', syncCalendar);
-        }
-
-        // Upload
         bindUploadEvents();
         bindChartControls();
 
-        // User dropdown
-        if (userAvatarBtn) {
-            userAvatarBtn.addEventListener('click', toggleDropdown);
-        }
+        if (userAvatarBtn) userAvatarBtn.addEventListener('click', toggleDropdown);
 
-        // Close dropdown on outside click
         document.addEventListener('click', (e) => {
             if (userDropdown && !userDropdown.contains(e.target) && !userAvatarBtn.contains(e.target)) {
                 closeDropdown();
             }
         });
 
-        // Sample data
         const btnTrySample = document.getElementById('btn-try-sample');
-        if (btnTrySample) {
-            btnTrySample.addEventListener('click', loadSampleData);
-        }
+        if (btnTrySample) btnTrySample.addEventListener('click', loadSampleData);
+
+        if (btnPickerAnalyze) btnPickerAnalyze.addEventListener('click', analyzeSelectedCalendars);
     }
 
     // === Auth State Handler ===
@@ -127,9 +112,14 @@
             updateUserUI(user);
             showNavUserMenu(true);
 
-            // Auto-sync calendar on login
+            // After login redirect, show calendar picker
             if (!dashboard.style.display || dashboard.style.display === 'none') {
-                syncCalendar();
+                const token = Auth.getGoogleAccessToken();
+                if (token) {
+                    showPickerScreen();
+                } else {
+                    enterOfflineMode();
+                }
             }
         } else {
             showNavUserMenu(false);
@@ -160,38 +150,108 @@
         if (navUserMenu) navUserMenu.style.display = show ? 'flex' : 'none';
     }
 
-    // === Calendar Sync ===
-    async function syncCalendar() {
-        const accessToken = await Auth.getGoogleAccessToken();
-
-        if (!accessToken) {
-            console.warn('No Google access token available');
-            // Show upload screen as fallback
+    // === Calendar Picker ===
+    async function showPickerScreen() {
+        const token = Auth.getGoogleAccessToken();
+        if (!token) {
             enterOfflineMode();
             return;
         }
 
-        showLoading('Syncing your calendar...');
+        hideAllScreens();
+        pickerScreen.style.display = 'flex';
+
+        pickerList.innerHTML = '<div class="picker-loading">Loading calendars...</div>';
+        btnPickerAnalyze.disabled = true;
+        selectedCalendarIds = [];
 
         try {
-            const events = await CalendarSync.fetchEvents(accessToken);
+            const calendars = await CalendarSync.listCalendars(token);
 
-            if (events.length === 0) {
-                hideLoading();
-                enterOfflineMode();
+            if (calendars.length === 0) {
+                pickerList.innerHTML = '<div class="picker-loading">No calendars found.</div>';
                 return;
             }
 
-            processEvents(events);
+            pickerList.innerHTML = '';
+
+            calendars.forEach((cal) => {
+                const item = document.createElement('div');
+                item.className = 'picker-item';
+                item.dataset.calendarId = cal.id;
+
+                // Auto-select primary calendar
+                if (cal.primary) {
+                    item.classList.add('selected');
+                    selectedCalendarIds.push(cal.id);
+                }
+
+                item.innerHTML = `
+                    <div class="picker-check">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <div class="picker-color" style="background: ${cal.color || 'var(--accent)'}"></div>
+                    <div class="picker-info">
+                        <span class="picker-name">${escapeHtml(cal.name)}${cal.primary ? '<span class="picker-primary-badge">Primary</span>' : ''}</span>
+                    </div>
+                `;
+
+                item.addEventListener('click', () => {
+                    item.classList.toggle('selected');
+                    const id = item.dataset.calendarId;
+
+                    if (item.classList.contains('selected')) {
+                        if (!selectedCalendarIds.includes(id)) selectedCalendarIds.push(id);
+                    } else {
+                        selectedCalendarIds = selectedCalendarIds.filter((c) => c !== id);
+                    }
+
+                    btnPickerAnalyze.disabled = selectedCalendarIds.length === 0;
+                });
+
+                pickerList.appendChild(item);
+            });
+
+            btnPickerAnalyze.disabled = selectedCalendarIds.length === 0;
+        } catch (err) {
+            console.error('Failed to load calendars:', err);
+            pickerList.innerHTML = '<div class="picker-loading">Failed to load calendars. Try again.</div>';
+        }
+    }
+
+    async function analyzeSelectedCalendars() {
+        const token = Auth.getGoogleAccessToken();
+        if (!token || selectedCalendarIds.length === 0) return;
+
+        showLoading('Syncing your calendars...');
+
+        try {
+            // Fetch events from all selected calendars in parallel
+            const results = await Promise.all(
+                selectedCalendarIds.map((calId) =>
+                    CalendarSync.fetchEvents(token, { calendarId: calId }).catch(() => [])
+                )
+            );
+
+            const allEvents = results.flat();
+
+            if (allEvents.length === 0) {
+                hideLoading();
+                alert('No events found in the selected calendars for the past ' + AppConfig.DEFAULT_FETCH_DAYS + ' days.');
+                return;
+            }
+
+            // Sort by start time
+            allEvents.sort((a, b) => a.start - b.start);
+            processEvents(allEvents);
         } catch (err) {
             console.error('Calendar sync error:', err);
             hideLoading();
 
             if (err.message === 'UNAUTHORIZED') {
-                // Token expired, re-auth
                 Auth.signInWithGoogle();
             } else {
-                enterOfflineMode();
+                alert('Error syncing calendars. Please try again.');
             }
         }
     }
@@ -201,9 +261,7 @@
         uploadZone.addEventListener('click', () => fileInput.click());
 
         fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                handleFile(e.target.files[0]);
-            }
+            if (e.target.files.length > 0) handleFile(e.target.files[0]);
         });
 
         uploadZone.addEventListener('dragover', (e) => {
@@ -218,9 +276,7 @@
         uploadZone.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadZone.classList.remove('drag-over');
-            if (e.dataTransfer.files.length > 0) {
-                handleFile(e.dataTransfer.files[0]);
-            }
+            if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
         });
     }
 
@@ -297,11 +353,9 @@
             const eased = 1 - Math.pow(1 - progress, 3);
             const current = target * eased;
 
-            if (Number.isInteger(target)) {
-                el.textContent = prefix + Math.round(current) + suffix;
-            } else {
-                el.textContent = prefix + (Math.round(current * 10) / 10) + suffix;
-            }
+            el.textContent = Number.isInteger(target)
+                ? prefix + Math.round(current) + suffix
+                : prefix + (Math.round(current * 10) / 10) + suffix;
 
             if (progress < 1) requestAnimationFrame(update);
         }
@@ -350,25 +404,28 @@
     }
 
     // === Screen Navigation ===
-    function showAuthScreen() {
-        isOfflineMode = false;
-        authScreen.style.display = 'flex';
+    function hideAllScreens() {
+        authScreen.style.display = 'none';
+        pickerScreen.style.display = 'none';
         uploadScreen.style.display = 'none';
         dashboard.style.display = 'none';
+    }
+
+    function showAuthScreen() {
+        isOfflineMode = false;
+        hideAllScreens();
+        authScreen.style.display = 'flex';
     }
 
     function enterOfflineMode() {
         isOfflineMode = true;
-        authScreen.style.display = 'none';
+        hideAllScreens();
         uploadScreen.style.display = 'flex';
-        dashboard.style.display = 'none';
     }
 
     function showDashboard() {
-        authScreen.style.display = 'none';
-        uploadScreen.style.display = 'none';
+        hideAllScreens();
         dashboard.style.display = 'block';
-        // Re-trigger animation
         dashboard.style.animation = 'none';
         dashboard.offsetHeight;
         dashboard.style.animation = 'fadeIn 0.5s var(--ease-out)';
@@ -393,12 +450,21 @@
         userDropdown.classList.remove('open');
     }
 
+    // === Helpers ===
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function capitalize(str) {
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
     // === Sample Data ===
     function loadSampleData() {
         showLoading('Generating sample data...');
-        setTimeout(() => {
-            processEvents(generateSampleEvents());
-        }, 400);
+        setTimeout(() => processEvents(generateSampleEvents()), 400);
     }
 
     function generateSampleEvents() {
@@ -475,10 +541,6 @@
             hash |= 0;
         }
         return Math.abs(hash);
-    }
-
-    function capitalize(str) {
-        return str.charAt(0).toUpperCase() + str.slice(1);
     }
 
 })();
