@@ -1,19 +1,17 @@
 /**
  * app.js — Main Application Controller
- * Handles file uploads, sample data, UI state, and wiring everything together.
+ * Manages auth flow, calendar sync, file uploads, and UI state.
  */
 
 (function () {
     'use strict';
 
     // === DOM Elements ===
+    const authScreen = document.getElementById('auth-screen');
     const uploadScreen = document.getElementById('upload-screen');
     const dashboard = document.getElementById('dashboard');
     const uploadZone = document.getElementById('upload-zone');
     const fileInput = document.getElementById('file-input');
-    const btnUpload = document.getElementById('btn-upload');
-    const btnLoadSample = document.getElementById('btn-load-sample');
-    const btnTrySample = document.getElementById('btn-try-sample');
     const loadingOverlay = document.getElementById('loading-overlay');
 
     // Stats
@@ -26,33 +24,188 @@
     const eventsTbody = document.getElementById('events-tbody');
     const eventsCountBadge = document.getElementById('events-count-badge');
 
-    // Daily chart range controls
+    // Controls
     const ctrlWeek = document.getElementById('ctrl-daily-week');
     const ctrlMonth = document.getElementById('ctrl-daily-month');
 
-    // === Initialization ===
+    // Auth buttons
+    const btnGoogleSignin = document.getElementById('btn-google-signin');
+    const btnOfflineMode = document.getElementById('btn-offline-mode');
+    const btnBackToAuth = document.getElementById('btn-back-to-auth');
+    const navSigninBtn = document.getElementById('nav-signin-btn');
+    const btnSignout = document.getElementById('btn-signout');
+
+    // Nav elements
+    const navAuthActions = document.getElementById('nav-auth-actions');
+    const navUserMenu = document.getElementById('nav-user-menu');
+    const btnUploadNav = document.getElementById('btn-upload-nav');
+    const btnSyncNav = document.getElementById('btn-sync-nav');
+
+    // User avatar/dropdown
+    const userAvatarBtn = document.getElementById('user-avatar-btn');
+    const userAvatarImg = document.getElementById('user-avatar-img');
+    const userAvatarFallback = document.getElementById('user-avatar-fallback');
+    const userDropdown = document.getElementById('user-dropdown');
+    const dropdownName = document.getElementById('dropdown-name');
+    const dropdownEmail = document.getElementById('dropdown-email');
+
+    // Theme
+    const themeToggle = document.getElementById('theme-toggle');
+
+    // === State ===
+    let isOfflineMode = false;
+
+    // === Initialize ===
     init();
 
     function init() {
+        // Theme first (no flash)
+        ThemeManager.init();
+
+        // Auth
+        Auth.init(handleAuthChange);
+
+        // Event listeners
+        bindEvents();
+    }
+
+    function bindEvents() {
+        // Theme toggle
+        themeToggle.addEventListener('click', ThemeManager.toggle);
+
+        // Auth buttons
+        btnGoogleSignin.addEventListener('click', () => Auth.signInWithGoogle());
+        btnOfflineMode.addEventListener('click', enterOfflineMode);
+        btnBackToAuth.addEventListener('click', showAuthScreen);
+
+        if (navSigninBtn) {
+            navSigninBtn.addEventListener('click', () => Auth.signInWithGoogle());
+        }
+
+        if (btnSignout) {
+            btnSignout.addEventListener('click', async () => {
+                closeDropdown();
+                await Auth.signOut();
+            });
+        }
+
+        // Nav actions (logged in)
+        if (btnUploadNav) {
+            btnUploadNav.addEventListener('click', () => fileInput.click());
+        }
+
+        if (btnSyncNav) {
+            btnSyncNav.addEventListener('click', syncCalendar);
+        }
+
+        // Upload
         bindUploadEvents();
-        bindNavEvents();
         bindChartControls();
+
+        // User dropdown
+        if (userAvatarBtn) {
+            userAvatarBtn.addEventListener('click', toggleDropdown);
+        }
+
+        // Close dropdown on outside click
+        document.addEventListener('click', (e) => {
+            if (userDropdown && !userDropdown.contains(e.target) && !userAvatarBtn.contains(e.target)) {
+                closeDropdown();
+            }
+        });
+
+        // Sample data
+        const btnTrySample = document.getElementById('btn-try-sample');
+        if (btnTrySample) {
+            btnTrySample.addEventListener('click', loadSampleData);
+        }
+    }
+
+    // === Auth State Handler ===
+    function handleAuthChange(user) {
+        if (user) {
+            updateUserUI(user);
+            showNavUserMenu(true);
+
+            // Auto-sync calendar on login
+            if (!dashboard.style.display || dashboard.style.display === 'none') {
+                syncCalendar();
+            }
+        } else {
+            showNavUserMenu(false);
+            if (!isOfflineMode) {
+                showAuthScreen();
+            }
+        }
+    }
+
+    function updateUserUI(user) {
+        if (dropdownName) dropdownName.textContent = user.name;
+        if (dropdownEmail) dropdownEmail.textContent = user.email;
+
+        if (user.avatar) {
+            userAvatarImg.src = user.avatar;
+            userAvatarImg.alt = user.name;
+            userAvatarImg.style.display = 'block';
+            userAvatarFallback.style.display = 'none';
+        } else {
+            userAvatarImg.style.display = 'none';
+            userAvatarFallback.style.display = 'flex';
+            userAvatarFallback.textContent = (user.name || user.email || '?').charAt(0).toUpperCase();
+        }
+    }
+
+    function showNavUserMenu(show) {
+        if (navAuthActions) navAuthActions.style.display = show ? 'none' : 'flex';
+        if (navUserMenu) navUserMenu.style.display = show ? 'flex' : 'none';
+    }
+
+    // === Calendar Sync ===
+    async function syncCalendar() {
+        const accessToken = await Auth.getGoogleAccessToken();
+
+        if (!accessToken) {
+            console.warn('No Google access token available');
+            // Show upload screen as fallback
+            enterOfflineMode();
+            return;
+        }
+
+        showLoading('Syncing your calendar...');
+
+        try {
+            const events = await CalendarSync.fetchEvents(accessToken);
+
+            if (events.length === 0) {
+                hideLoading();
+                enterOfflineMode();
+                return;
+            }
+
+            processEvents(events);
+        } catch (err) {
+            console.error('Calendar sync error:', err);
+            hideLoading();
+
+            if (err.message === 'UNAUTHORIZED') {
+                // Token expired, re-auth
+                Auth.signInWithGoogle();
+            } else {
+                enterOfflineMode();
+            }
+        }
     }
 
     // === Upload Handling ===
     function bindUploadEvents() {
-        // Click to upload
         uploadZone.addEventListener('click', () => fileInput.click());
-        btnUpload.addEventListener('click', () => fileInput.click());
 
-        // File selected
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 handleFile(e.target.files[0]);
             }
         });
 
-        // Drag and drop
         uploadZone.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadZone.classList.add('drag-over');
@@ -71,11 +224,6 @@
         });
     }
 
-    function bindNavEvents() {
-        btnLoadSample.addEventListener('click', loadSampleData);
-        btnTrySample.addEventListener('click', loadSampleData);
-    }
-
     function bindChartControls() {
         ctrlWeek.addEventListener('click', () => {
             ctrlWeek.classList.add('active');
@@ -90,32 +238,26 @@
         });
     }
 
-    // === File Processing ===
     function handleFile(file) {
         const reader = new FileReader();
-
-        showLoading();
+        showLoading('Analyzing your calendar...');
 
         reader.onload = (e) => {
-            const content = e.target.result;
-
             setTimeout(() => {
                 try {
-                    const events = CalendarParser.parseICS(content);
-
+                    const events = CalendarParser.parseICS(e.target.result);
                     if (events.length === 0) {
                         hideLoading();
-                        alert('No events found in this file. Please check the file format.');
+                        alert('No events found in this file.');
                         return;
                     }
-
                     processEvents(events);
                 } catch (err) {
                     hideLoading();
                     console.error('Parse error:', err);
                     alert('Error parsing file. Please ensure it\'s a valid .ics file.');
                 }
-            }, 400); // Small delay for loading animation
+            }, 300);
         };
 
         reader.onerror = () => {
@@ -129,36 +271,31 @@
     function processEvents(events) {
         const report = CalendarAnalytics.generateReport(events);
 
-        // Update stats with animated counting
         animateStat(statEvents, report.summary.totalEvents, '', '');
         animateStat(statHours, report.summary.totalHours, '', 'h');
         animateStat(statAvg, report.summary.avgDurationMin, '', 'm');
         animateStat(statLoad, report.summary.meetingLoad, '', '%');
 
-        // Render charts
         CalendarCharts.destroyAll();
         CalendarCharts.renderAll(report);
 
-        // Populate events table
         renderEventsTable(report.recentEvents);
         eventsCountBadge.textContent = `${report.summary.totalEvents} events`;
 
-        // Show dashboard
         showDashboard();
         hideLoading();
     }
 
     // === Stats Animation ===
-    function animateStat(el, target, prefix = '', suffix = '') {
-        const duration = 800;
+    function animateStat(el, target, prefix, suffix) {
+        const duration = 600;
         const startTime = performance.now();
-        const startVal = 0;
 
         function update(currentTime) {
             const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
-            const current = startVal + (target - startVal) * eased;
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const current = target * eased;
 
             if (Number.isInteger(target)) {
                 el.textContent = prefix + Math.round(current) + suffix;
@@ -166,9 +303,7 @@
                 el.textContent = prefix + (Math.round(current * 10) / 10) + suffix;
             }
 
-            if (progress < 1) {
-                requestAnimationFrame(update);
-            }
+            if (progress < 1) requestAnimationFrame(update);
         }
 
         requestAnimationFrame(update);
@@ -186,11 +321,7 @@
 
             const tdDate = document.createElement('td');
             tdDate.textContent = event.start.toLocaleDateString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit'
+                weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
             });
 
             const tdDuration = document.createElement('td');
@@ -218,17 +349,34 @@
         }
     }
 
-    // === UI State ===
-    function showDashboard() {
+    // === Screen Navigation ===
+    function showAuthScreen() {
+        isOfflineMode = false;
+        authScreen.style.display = 'flex';
         uploadScreen.style.display = 'none';
-        dashboard.style.display = 'block';
-        dashboard.style.animation = 'none';
-        // Trigger reflow
-        dashboard.offsetHeight;
-        dashboard.style.animation = 'fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)';
+        dashboard.style.display = 'none';
     }
 
-    function showLoading() {
+    function enterOfflineMode() {
+        isOfflineMode = true;
+        authScreen.style.display = 'none';
+        uploadScreen.style.display = 'flex';
+        dashboard.style.display = 'none';
+    }
+
+    function showDashboard() {
+        authScreen.style.display = 'none';
+        uploadScreen.style.display = 'none';
+        dashboard.style.display = 'block';
+        // Re-trigger animation
+        dashboard.style.animation = 'none';
+        dashboard.offsetHeight;
+        dashboard.style.animation = 'fadeIn 0.5s var(--ease-out)';
+    }
+
+    function showLoading(text) {
+        const loadingText = loadingOverlay.querySelector('.loading-text');
+        if (loadingText && text) loadingText.textContent = text;
         loadingOverlay.style.display = 'flex';
     }
 
@@ -236,14 +384,21 @@
         loadingOverlay.style.display = 'none';
     }
 
-    // === Sample Data Generator ===
-    function loadSampleData() {
-        showLoading();
+    // === Dropdown ===
+    function toggleDropdown() {
+        userDropdown.classList.toggle('open');
+    }
 
+    function closeDropdown() {
+        userDropdown.classList.remove('open');
+    }
+
+    // === Sample Data ===
+    function loadSampleData() {
+        showLoading('Generating sample data...');
         setTimeout(() => {
-            const events = generateSampleEvents();
-            processEvents(events);
-        }, 600);
+            processEvents(generateSampleEvents());
+        }, 400);
     }
 
     function generateSampleEvents() {
@@ -251,7 +406,6 @@
         const now = new Date();
         const baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        // Event templates with category hints
         const templates = [
             { summary: 'Daily Stand-up', hour: 9, duration: 15, category: 'meeting', freq: 'daily' },
             { summary: 'Sprint Planning', hour: 10, duration: 60, category: 'meeting', freq: 'biweekly' },
@@ -275,12 +429,10 @@
             { summary: 'Cross-team Sync', hour: 13, duration: 30, category: 'meeting', freq: 'weekly' }
         ];
 
-        // Generate 8 weeks of data (going back from today)
         for (let weekOffset = -8; weekOffset <= 0; weekOffset++) {
-            for (let dayOfWeek = 0; dayOfWeek < 5; dayOfWeek++) { // Mon-Fri
+            for (let dayOfWeek = 0; dayOfWeek < 5; dayOfWeek++) {
                 const day = new Date(baseDate);
                 day.setDate(day.getDate() + (weekOffset * 7) + dayOfWeek - baseDate.getDay() + 1);
-
                 if (day > now) continue;
 
                 for (const template of templates) {
@@ -288,45 +440,25 @@
                     const weekNum = Math.abs(weekOffset);
 
                     switch (template.freq) {
-                        case 'daily':
-                            shouldAdd = true;
-                            break;
-                        case 'weekly':
-                            shouldAdd = dayOfWeek === hashStr(template.summary) % 5;
-                            break;
-                        case 'biweekly':
-                            shouldAdd = weekNum % 2 === 0 && dayOfWeek === hashStr(template.summary) % 5;
-                            break;
-                        case 'triweekly':
-                            shouldAdd = weekNum % 3 === 0 && dayOfWeek === hashStr(template.summary) % 5;
-                            break;
-                        case 'monthly':
-                            shouldAdd = weekNum % 4 === 0 && dayOfWeek === hashStr(template.summary) % 5;
-                            break;
+                        case 'daily': shouldAdd = true; break;
+                        case 'weekly': shouldAdd = dayOfWeek === hashStr(template.summary) % 5; break;
+                        case 'biweekly': shouldAdd = weekNum % 2 === 0 && dayOfWeek === hashStr(template.summary) % 5; break;
+                        case 'triweekly': shouldAdd = weekNum % 3 === 0 && dayOfWeek === hashStr(template.summary) % 5; break;
+                        case 'monthly': shouldAdd = weekNum % 4 === 0 && dayOfWeek === hashStr(template.summary) % 5; break;
                     }
 
                     if (shouldAdd) {
-                        // Add some variance
                         const variance = (hashStr(template.summary + day.toISOString()) % 20) - 10;
-                        const startHour = template.hour;
                         const startMin = Math.max(0, Math.min(55, variance > 0 ? variance : 0));
-
                         const start = new Date(day);
-                        start.setHours(startHour, startMin, 0, 0);
-
+                        start.setHours(template.hour, startMin, 0, 0);
                         const end = new Date(start.getTime() + template.duration * 60000);
 
                         events.push({
-                            summary: template.summary,
-                            start,
-                            end,
-                            durationMin: template.duration,
-                            allDay: false,
-                            description: '',
-                            location: '',
-                            categories: [],
-                            status: 'CONFIRMED',
-                            category: template.category
+                            summary: template.summary, start, end,
+                            durationMin: template.duration, allDay: false,
+                            description: '', location: '', categories: [],
+                            status: 'CONFIRMED', category: template.category
                         });
                     }
                 }
@@ -336,7 +468,6 @@
         return events.sort((a, b) => a.start - b.start);
     }
 
-    // Simple string hash for deterministic "randomness"
     function hashStr(str) {
         let hash = 0;
         for (let i = 0; i < str.length; i++) {

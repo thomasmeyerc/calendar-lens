@@ -27,12 +27,40 @@ const CalendarCharts = (() => {
     ];
 
     // Chart.js global defaults
-    Chart.defaults.color = '#9b9bc0';
     Chart.defaults.font.family = "'Inter', sans-serif";
     Chart.defaults.font.size = 12;
     Chart.defaults.plugins.legend.labels.usePointStyle = true;
     Chart.defaults.plugins.legend.labels.pointStyle = 'circle';
     Chart.defaults.plugins.legend.labels.padding = 16;
+
+    // Theme-aware helpers
+    function getThemeColor(prop) {
+        return getComputedStyle(document.documentElement).getPropertyValue(prop).trim();
+    }
+
+    function isDark() {
+        return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+
+    function tooltipStyle() {
+        return {
+            backgroundColor: isDark() ? 'rgba(15, 15, 26, 0.95)' : 'rgba(15, 23, 42, 0.95)',
+            titleColor: '#fff',
+            bodyColor: '#e2e8f0',
+            borderColor: isDark() ? 'rgba(129, 140, 248, 0.2)' : 'rgba(0, 0, 0, 0.1)',
+            borderWidth: 1,
+            padding: 12,
+            cornerRadius: 8,
+        };
+    }
+
+    function gridColor() {
+        return isDark() ? 'rgba(130, 140, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)';
+    }
+
+    function applyThemeDefaults() {
+        Chart.defaults.color = isDark() ? '#9b9bb8' : '#64748b';
+    }
 
     // Store chart instances for cleanup
     const charts = {};
@@ -41,6 +69,7 @@ const CalendarCharts = (() => {
      * Render all charts from analytics report.
      */
     function renderAll(report) {
+        applyThemeDefaults();
         renderAllocation(report.categoryBreakdown);
         renderDaily(report.dailyHours);
         renderHeatmap(report.heatmap);
@@ -93,12 +122,8 @@ const CalendarCharts = (() => {
                         }
                     },
                     tooltip: {
-                        backgroundColor: 'rgba(13, 13, 43, 0.95)',
-                        borderColor: 'rgba(129, 140, 248, 0.2)',
-                        borderWidth: 1,
+                        ...tooltipStyle(),
                         titleFont: { weight: 600 },
-                        padding: 12,
-                        cornerRadius: 8,
                         callbacks: {
                             label: (ctx) => {
                                 const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
@@ -151,11 +176,7 @@ const CalendarCharts = (() => {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: 'rgba(13, 13, 43, 0.95)',
-                        borderColor: 'rgba(129, 140, 248, 0.2)',
-                        borderWidth: 1,
-                        padding: 12,
-                        cornerRadius: 8,
+                        ...tooltipStyle(),
                         callbacks: {
                             label: (ctx) => ` ${ctx.raw} hours`
                         }
@@ -173,7 +194,7 @@ const CalendarCharts = (() => {
                     },
                     y: {
                         grid: {
-                            color: 'rgba(130, 140, 255, 0.06)',
+                            color: gridColor(),
                             drawBorder: false
                         },
                         ticks: {
@@ -292,7 +313,7 @@ const CalendarCharts = (() => {
                     backgroundColor: 'rgba(129, 140, 248, 0.1)',
                     borderWidth: 2.5,
                     pointBackgroundColor: '#818cf8',
-                    pointBorderColor: '#0d0d2b',
+                    pointBorderColor: isDark() ? '#0f0f1a' : '#ffffff',
                     pointBorderWidth: 2,
                     pointRadius: 5,
                     pointHoverRadius: 7,
@@ -306,11 +327,7 @@ const CalendarCharts = (() => {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: 'rgba(13, 13, 43, 0.95)',
-                        borderColor: 'rgba(129, 140, 248, 0.2)',
-                        borderWidth: 1,
-                        padding: 12,
-                        cornerRadius: 8,
+                        ...tooltipStyle(),
                         callbacks: {
                             title: (items) => `Week of ${items[0].label}`,
                             label: (ctx) => ` ${ctx.raw} hours`
@@ -325,7 +342,7 @@ const CalendarCharts = (() => {
                     },
                     y: {
                         grid: {
-                            color: 'rgba(130, 140, 255, 0.06)',
+                            color: gridColor(),
                             drawBorder: false
                         },
                         ticks: {
@@ -372,11 +389,7 @@ const CalendarCharts = (() => {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: 'rgba(13, 13, 43, 0.95)',
-                        borderColor: 'rgba(129, 140, 248, 0.2)',
-                        borderWidth: 1,
-                        padding: 12,
-                        cornerRadius: 8,
+                        ...tooltipStyle(),
                         callbacks: {
                             label: (ctx) => ` ${ctx.raw} events`
                         }
@@ -385,7 +398,7 @@ const CalendarCharts = (() => {
                 scales: {
                     x: {
                         grid: {
-                            color: 'rgba(130, 140, 255, 0.06)',
+                            color: gridColor(),
                             drawBorder: false
                         },
                         ticks: { font: { size: 11 } },
