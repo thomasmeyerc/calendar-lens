@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
 import { useCalendar } from './hooks/useCalendar';
@@ -171,14 +171,16 @@ export default function App() {
   }, [setEvents]);
 
   // Handle post-OAuth redirect
-  if (!authLoading && user && accessToken && screen === 'auth') {
-    if (events.length > 0) {
-      setScreen('dashboard');
-    } else {
-      loadCalendars(accessToken);
-      setScreen('picker');
+  useEffect(() => {
+    if (!authLoading && user && accessToken && screen === 'auth') {
+      if (events.length > 0) {
+        setScreen('dashboard');
+      } else {
+        loadCalendars(accessToken);
+        setScreen('picker');
+      }
     }
-  }
+  }, [authLoading, user, accessToken, screen, events.length, loadCalendars]);
 
   if (authLoading) {
     return (
