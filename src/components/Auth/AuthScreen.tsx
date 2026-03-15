@@ -4,9 +4,10 @@ interface AuthScreenProps {
   onSignIn: () => void;
   onOfflineMode: () => void;
   isConfigured: boolean;
+  error?: string | null;
 }
 
-export function AuthScreen({ onSignIn, onOfflineMode, isConfigured }: AuthScreenProps) {
+export function AuthScreen({ onSignIn, onOfflineMode, isConfigured, error }: AuthScreenProps) {
   return (
     <div className="auth-screen">
       <div className="auth-container">
@@ -26,6 +27,12 @@ export function AuthScreen({ onSignIn, onOfflineMode, isConfigured }: AuthScreen
           <h1 className="auth-title">Understand how you spend your time</h1>
           <p className="auth-subtitle">Connect your Google Calendar or upload an .ics file to visualize patterns and gain insights.</p>
         </div>
+
+        {error && (
+          <p style={{ color: 'var(--color-rose)', fontSize: '0.875rem', marginBottom: 'var(--space-sm)', textAlign: 'center' }}>
+            {error}
+          </p>
+        )}
 
         {isConfigured && <GoogleSignInButton onClick={onSignIn} />}
         {!isConfigured && <p className="auth-hint">Google sign-in not configured. Use offline mode.</p>}

@@ -118,7 +118,7 @@ function generateSampleEvents(): CalendarEvent[] {
 }
 
 export default function App() {
-  const { user, loading: authLoading, accessToken, isConfigured, signIn, signOut, isTokenExpired } = useAuth();
+  const { user, loading: authLoading, accessToken, error: authError, isConfigured, signIn, signOut, setError: setAuthError, isTokenExpired } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const { calendars, events, loading: calLoading, error, loadCalendars, loadEvents, importICS, setEvents } = useCalendar();
   const { report, dateRange, setDateRange, resetDateRange } = useAnalytics(events);
@@ -128,14 +128,18 @@ export default function App() {
 
   // Navigate to picker after auth
   const handleSignIn = useCallback(async () => {
-    await signIn();
-    // After sign-in completes, navigate to picker
+    setAuthError(null);
+    const result = await signIn();
+    if (!result.success) {
+      if (result.error) setAuthError(result.error);
+      return;
+    }
     const token = localStorage.getItem('calendarlens-google-token');
     if (token) {
       await loadCalendars(token);
       setScreen('picker');
     }
-  }, [signIn, loadCalendars]);
+  }, [signIn, loadCalendars, setAuthError]);
 
   const handleSignOut = useCallback(async () => {
     await signOut();
@@ -231,6 +235,7 @@ export default function App() {
           onSignIn={handleSignIn}
           onOfflineMode={() => setScreen('upload')}
           isConfigured={isConfigured}
+          error={authError}
         />
       )}
 
