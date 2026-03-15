@@ -4,10 +4,11 @@ interface AuthScreenProps {
   onSignIn: () => void;
   onOfflineMode: () => void;
   isConfigured: boolean;
+  configError?: string | null;
   error?: string | null;
 }
 
-export function AuthScreen({ onSignIn, onOfflineMode, isConfigured, error }: AuthScreenProps) {
+export function AuthScreen({ onSignIn, onOfflineMode, isConfigured, configError, error }: AuthScreenProps) {
   return (
     <div className="auth-screen">
       <div className="auth-container">
@@ -31,7 +32,12 @@ export function AuthScreen({ onSignIn, onOfflineMode, isConfigured, error }: Aut
         {error && <p className="auth-error" style={{ color: 'var(--color-error, #dc3545)', marginBottom: '1rem', fontSize: '0.9rem' }}>{error}</p>}
 
         {isConfigured && <GoogleSignInButton onClick={onSignIn} />}
-        {!isConfigured && <p className="auth-hint">Google sign-in not configured. Use offline mode.</p>}
+        {!isConfigured && (
+          <div className="auth-hint">
+            <p>Google sign-in not configured.</p>
+            {configError && <p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '0.25rem' }}>{configError}</p>}
+          </div>
+        )}
 
         <div className="auth-divider"><span>or</span></div>
 
