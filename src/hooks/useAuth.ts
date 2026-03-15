@@ -18,6 +18,7 @@ interface TokenResponse {
   scope: string;
   token_type: string;
   error?: string;
+  error_description?: string;
 }
 
 interface GoogleUserInfo {
@@ -40,6 +41,7 @@ declare global {
             client_id: string;
             scope: string;
             callback: (response: TokenResponse) => void;
+            error_callback?: (error: { type: string; message?: string }) => void;
           }) => TokenClient;
           revoke: (token: string, callback?: () => void) => void;
         };
@@ -77,7 +79,6 @@ function getSavedToken(): string | null {
   if (savedToken && savedTs && (Date.now() - parseInt(savedTs, 10)) < TOKEN_EXPIRY_MS) {
     return savedToken;
   }
-  // Clean up expired tokens
   if (savedToken) {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(TOKEN_TS_KEY);
@@ -89,8 +90,9 @@ export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(() => getSavedToken());
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const tokenClientRef = useRef<TokenClient | null>(null);
-  const signInResolveRef = useRef<(() => void) | null>(null);
+  const signInResolveRef = useRef<((result: { success: boolean; error?: string }) => void) | null>(null);
 
   useEffect(() => {
     if (!isConfigured()) {
@@ -120,7 +122,9 @@ export function useAuth() {
         scope: GOOGLE_CALENDAR_SCOPES + ' openid email profile',
         callback: async (response: TokenResponse) => {
           if (response.error) {
-            signInResolveRef.current?.();
+            const msg = response.error_description || response.error;
+            console.error('[CalendarLens] OAuth error:', msg);
+            signInResolveRef.current?.({ success: false, error: msg });
             signInResolveRef.current = null;
             return;
           }
@@ -133,21 +137,30 @@ export function useAuth() {
           } catch {
             // Token is valid even if userinfo fails
           }
-          signInResolveRef.current?.();
+          signInResolveRef.current?.({ success: true });
+          signInResolveRef.current = null;
+        },
+        error_callback: (err) => {
+          // Called when popup is closed or blocked
+          console.error('[CalendarLens] OAuth popup error:', err.type, err.message);
+          const msg = err.type === 'popup_closed' ? 'Sign-in popup was closed.' :
+                      err.type === 'popup_blocked' ? 'Popup was blocked by the browser. Please allow popups.' :
+                      err.message || 'Sign-in failed.';
+          signInResolveRef.current?.({ success: false, error: msg });
           signInResolveRef.current = null;
         },
       });
     });
-  // Run only on mount
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const signIn = useCallback((): Promise<void> => {
-    return new Promise<void>((resolve) => {
+  const signIn = useCallback((): Promise<{ success: boolean; error?: string }> => {
+    return new Promise((resolve) => {
       if (!tokenClientRef.current) {
-        resolve();
+        resolve({ success: false, error: 'Google sign-in is not ready. Please refresh the page.' });
         return;
       }
+      setError(null);
       signInResolveRef.current = resolve;
       tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
     });
@@ -162,6 +175,7 @@ export function useAuth() {
     localStorage.removeItem(TOKEN_TS_KEY);
     setAccessToken(null);
     setUser(null);
+    setError(null);
   }, []);
 
   const isTokenExpired = useCallback((): boolean => {
@@ -174,10 +188,12 @@ export function useAuth() {
     user,
     loading,
     accessToken,
+    error,
     isAuthenticated: user !== null,
     isConfigured: isConfigured(),
     signIn,
     signOut,
+    setError,
     isTokenExpired,
   };
 }
