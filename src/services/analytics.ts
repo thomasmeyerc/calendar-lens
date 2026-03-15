@@ -8,6 +8,7 @@ import type {
   HeatmapData,
   DurationBucket,
   EventCategory,
+  Insight,
 } from '../types/calendar';
 import { APP_CONFIG } from '../types/calendar';
 
@@ -26,6 +27,7 @@ export function generateReport(events: CalendarEvent[]): AnalyticsReport {
     weeklyTrend: computeWeeklyTrend(timedEvents),
     heatmap: computeHeatmap(timedEvents),
     durationDistribution: computeDurationDistribution(timedEvents),
+    insights: generateInsights(validEvents, timedEvents),
     recentEvents: getRecentEvents(validEvents, APP_CONFIG.maxEventsDisplay),
     dateRange: getDateRange(validEvents),
   };
@@ -179,4 +181,112 @@ function getDateRange(events: CalendarEvent[]): { start: Date; end: Date } {
   // BUG FIX: use e.end instead of e.start for end bound
   const end = new Date(Math.max(...events.map(e => (e.end || e.start).getTime())));
   return { start, end };
+}
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function generateInsights(_allEvents: CalendarEvent[], timedEvents: CalendarEvent[]): Insight[] {
+  const insights: Insight[] = [];
+  if (timedEvents.length === 0) return insights;
+
+  // 1. Busiest day of the week
+  const dayTotals = Array(7).fill(0) as number[];
+  for (const e of timedEvents) {
+    dayTotals[e.start.getDay()]! += e.durationMin;
+  }
+  const weeks = Math.max(1, new Set(timedEvents.map(e => getWeekKey(e.start))).size);
+  const avgPerDay = dayTotals.map(t => t / weeks);
+  const busiestDayIdx = avgPerDay.indexOf(Math.max(...avgPerDay));
+  const busiestHours = Math.round(avgPerDay[busiestDayIdx]! / 6) / 10;
+  insights.push({
+    icon: 'calendar',
+    color: 'indigo',
+    text: `${DAY_NAMES[busiestDayIdx]} is your busiest day, averaging ${busiestHours} hours of scheduled time per week.`,
+  });
+
+  // 2. Meeting vs focus ratio
+  const totalScheduled = timedEvents.reduce((s, e) => s + e.durationMin, 0);
+  const meetingMin = timedEvents.filter(e => e.category === 'meeting').reduce((s, e) => s + e.durationMin, 0);
+  const focusMin = timedEvents.filter(e => e.category === 'focus').reduce((s, e) => s + e.durationMin, 0);
+  const meetingPct = Math.round((meetingMin / totalScheduled) * 100);
+  if (focusMin > 0) {
+    const ratio = Math.round((meetingMin / focusMin) * 10) / 10;
+    insights.push({
+      icon: 'clock',
+      color: 'blue',
+      text: `You spend ${meetingPct}% of your scheduled time in meetings, with a ${ratio}:1 meeting-to-focus ratio — ${ratio > 2 ? 'consider blocking more deep work slots' : 'a healthy balance'}.`,
+    });
+  } else {
+    insights.push({
+      icon: 'clock',
+      color: 'blue',
+      text: `Meetings account for ${meetingPct}% of your calendar — no explicit focus time blocked yet.`,
+    });
+  }
+
+  // 3. Peak hour analysis
+  const hourBuckets = Array(24).fill(0) as number[];
+  for (const e of timedEvents) {
+    hourBuckets[e.start.getHours()]! += e.durationMin;
+  }
+  const peakHour = hourBuckets.indexOf(Math.max(...hourBuckets));
+  const peakLabel = peakHour < 12 ? `${peakHour === 0 ? 12 : peakHour} AM` : `${peakHour === 12 ? 12 : peakHour - 12} PM`;
+  const morningMin = hourBuckets.slice(6, 12).reduce((a, b) => a + b, 0);
+  const afternoonMin = hourBuckets.slice(12, 18).reduce((a, b) => a + b, 0);
+  const timeOfDay = morningMin > afternoonMin ? 'morning person' : 'afternoon person';
+  insights.push({
+    icon: 'zap',
+    color: 'teal',
+    text: `Your calendar peaks at ${peakLabel} — you're a ${timeOfDay}, with ${Math.round(Math.max(morningMin, afternoonMin) / 60)} hours packed into your ${morningMin > afternoonMin ? 'mornings' : 'afternoons'}.`,
+  });
+
+  // 4. Most recurring event
+  const eventCounts: Record<string, { count: number; original: string; totalMin: number }> = {};
+  for (const e of timedEvents) {
+    const name = e.summary.toLowerCase().trim();
+    if (!eventCounts[name]) {
+      eventCounts[name] = { count: 0, original: e.summary, totalMin: 0 };
+    }
+    eventCounts[name].count++;
+    eventCounts[name].totalMin += e.durationMin;
+  }
+  const sorted = Object.values(eventCounts).sort((a, b) => b.count - a.count);
+  if (sorted.length > 0 && sorted[0]!.count > 1) {
+    const top = sorted[0]!;
+    const totalHrs = Math.round(top.totalMin / 6) / 10;
+    insights.push({
+      icon: 'repeat',
+      color: 'rose',
+      text: `"${top.original}" is your most recurring event, appearing ${top.count} times and consuming ${totalHrs} hours total — ${Math.round((top.totalMin / totalScheduled) * 100)}% of scheduled time.`,
+    });
+  } else {
+    insights.push({
+      icon: 'repeat',
+      color: 'rose',
+      text: `Your calendar is highly varied — no single event repeats more than once.`,
+    });
+  }
+
+  // 5. Lightest day + free time potential
+  const nonZeroDays = avgPerDay.filter(d => d > 0);
+  const lightestDayIdx = nonZeroDays.length > 0
+    ? avgPerDay.indexOf(Math.min(...nonZeroDays))
+    : avgPerDay.indexOf(0);
+  const lightestHours = Math.round(avgPerDay[lightestDayIdx]! / 6) / 10;
+  const avgDailyHours = Math.round(avgPerDay.reduce((a, b) => a + b, 0) / 7 / 6) / 10;
+  if (lightestHours === 0) {
+    insights.push({
+      icon: 'sun',
+      color: 'amber',
+      text: `${DAY_NAMES[lightestDayIdx]} is completely free — across other days you average ${avgDailyHours} hours of commitments.`,
+    });
+  } else {
+    insights.push({
+      icon: 'sun',
+      color: 'amber',
+      text: `${DAY_NAMES[lightestDayIdx]} is your lightest day at ${lightestHours} hours — ${Math.round((1 - lightestHours / busiestHours) * 100)}% less than ${DAY_NAMES[busiestDayIdx]}, ideal for deep work.`,
+    });
+  }
+
+  return insights;
 }
