@@ -1,5 +1,13 @@
 export type EventCategory = 'meeting' | 'focus' | 'social' | 'admin' | 'other';
 
+export interface Attendee {
+  email: string;
+  name: string;
+  self: boolean;
+  organizer: boolean;
+  status: string;
+}
+
 export interface CalendarEvent {
   summary: string;
   start: Date;
@@ -11,6 +19,9 @@ export interface CalendarEvent {
   categories: string[];
   status: string;
   category: EventCategory;
+  attendees?: Attendee[];
+  attendeeCount?: number;
+  organizer?: { email: string; name: string } | null;
 }
 
 export interface GoogleCalendar {
@@ -71,6 +82,30 @@ export interface Insight {
   text: string;
 }
 
+export interface Collaborator {
+  name: string;
+  email: string;
+  count: number;
+  totalMinutes: number;
+  totalHours: number;
+}
+
+export interface MeetingSizeBucket {
+  label: string;
+  min: number;
+  max: number;
+  count: number;
+  minutes: number;
+}
+
+export interface AttendeeInsights {
+  topCollaborators: Collaborator[];
+  meetingSizeDistribution: MeetingSizeBucket[];
+  uniquePeople: number;
+  avgAttendees: number;
+  meetingsWithAttendees: number;
+}
+
 export interface AnalyticsReport {
   summary: ReportSummary;
   categoryBreakdown: CategoryBreakdown[];
@@ -79,6 +114,7 @@ export interface AnalyticsReport {
   heatmap: HeatmapData;
   durationDistribution: DurationBucket[];
   insights: Insight[];
+  attendeeInsights: AttendeeInsights;
   recentEvents: CalendarEvent[];
   dateRange: { start: Date; end: Date };
 }

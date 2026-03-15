@@ -1065,6 +1065,43 @@ body {
     opacity: 1;
 }
 
+/* === Attendee Insights === */
+.attendee-stats-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+}
+
+.stat-icon-emerald {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--emerald);
+}
+
+.stat-icon-amber {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--amber);
+}
+
+.charts-grid-attendees {
+    margin-bottom: var(--space-md);
+}
+
+.chart-body-tall {
+    height: 340px;
+    padding: var(--space-lg);
+    position: relative;
+}
+
+.chart-empty-msg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-dim);
+    font-size: 0.875rem;
+}
+
 /* === Events Table === */
 .table-wrapper {
     overflow-x: auto;
@@ -1188,9 +1225,15 @@ body {
     .chart-card-wide {
         grid-column: 1;
     }
+    .attendee-stats-row {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
 @media (max-width: 640px) {
+    .attendee-stats-row {
+        grid-template-columns: 1fr;
+    }
     .navbar {
         padding: 10px var(--space-md);
     }

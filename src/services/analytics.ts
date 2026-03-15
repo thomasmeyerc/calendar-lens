@@ -9,6 +9,9 @@ import type {
   DurationBucket,
   EventCategory,
   Insight,
+  AttendeeInsights,
+  Collaborator,
+  MeetingSizeBucket,
 } from '../types/calendar';
 import { APP_CONFIG } from '../types/calendar';
 
@@ -28,6 +31,7 @@ export function generateReport(events: CalendarEvent[]): AnalyticsReport {
     heatmap: computeHeatmap(timedEvents),
     durationDistribution: computeDurationDistribution(timedEvents),
     insights: generateInsights(validEvents, timedEvents),
+    attendeeInsights: computeAttendeeInsights(timedEvents),
     recentEvents: getRecentEvents(validEvents, APP_CONFIG.maxEventsDisplay),
     dateRange: getDateRange(validEvents),
   };
@@ -289,4 +293,58 @@ function generateInsights(_allEvents: CalendarEvent[], timedEvents: CalendarEven
   }
 
   return insights;
+}
+
+function computeAttendeeInsights(events: CalendarEvent[]): AttendeeInsights {
+  const eventsWithAttendees = events.filter(e => e.attendees && e.attendees.length > 0);
+  const collaborators: Record<string, Omit<Collaborator, 'totalHours'>> = {};
+  let totalAttendees = 0;
+
+  const sizeBuckets: MeetingSizeBucket[] = [
+    { label: '1:1', min: 2, max: 2, count: 0, minutes: 0 },
+    { label: 'Small (3-5)', min: 3, max: 5, count: 0, minutes: 0 },
+    { label: 'Medium (6-10)', min: 6, max: 10, count: 0, minutes: 0 },
+    { label: 'Large (11+)', min: 11, max: Infinity, count: 0, minutes: 0 },
+  ];
+
+  for (const event of eventsWithAttendees) {
+    const attendeeCount = event.attendees!.length;
+    totalAttendees += attendeeCount;
+
+    for (const att of event.attendees!) {
+      if (att.self) continue;
+      const key = att.email || att.name;
+      if (!collaborators[key]) {
+        collaborators[key] = { name: att.name, email: att.email, count: 0, totalMinutes: 0 };
+      }
+      collaborators[key].count += 1;
+      collaborators[key].totalMinutes += event.durationMin;
+    }
+
+    for (const bucket of sizeBuckets) {
+      if (attendeeCount >= bucket.min && attendeeCount <= bucket.max) {
+        bucket.count += 1;
+        bucket.minutes += event.durationMin;
+        break;
+      }
+    }
+  }
+
+  const topCollaborators: Collaborator[] = Object.values(collaborators)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10)
+    .map(c => ({ ...c, totalHours: Math.round(c.totalMinutes / 6) / 10 }));
+
+  const uniquePeople = Object.keys(collaborators).length;
+  const avgAttendees = eventsWithAttendees.length > 0
+    ? Math.round((totalAttendees / eventsWithAttendees.length) * 10) / 10
+    : 0;
+
+  return {
+    topCollaborators,
+    meetingSizeDistribution: sizeBuckets,
+    uniquePeople,
+    avgAttendees,
+    meetingsWithAttendees: eventsWithAttendees.length,
+  };
 }

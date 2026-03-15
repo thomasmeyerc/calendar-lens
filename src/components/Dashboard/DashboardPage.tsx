@@ -9,6 +9,7 @@ import { WeeklyTrend } from '../Charts/WeeklyTrend';
 import { DurationDistribution } from '../Charts/DurationDistribution';
 import { EventsTable } from '../Events/EventsTable';
 import { TimeInsights } from './TimeInsights';
+import { AttendeeInsights } from './AttendeeInsights';
 
 interface DashboardPageProps {
   report: AnalyticsReport;
@@ -37,6 +38,8 @@ export function DashboardPage({ report, events, dateRange, onDateRangeApply, onD
         <WeeklyTrend data={report.weeklyTrend} />
         <DurationDistribution data={report.durationDistribution} />
       </div>
+
+      <AttendeeInsights data={report.attendeeInsights} />
 
       <EventsTable events={report.recentEvents} totalCount={report.summary.totalEvents} />
     </div>
