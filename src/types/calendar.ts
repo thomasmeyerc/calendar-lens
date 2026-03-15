@@ -106,6 +106,50 @@ export interface AttendeeInsights {
   meetingsWithAttendees: number;
 }
 
+export type TrendDirection = 'up' | 'down' | 'stable';
+
+export interface TrendChange {
+  direction: TrendDirection;
+  percent: number;
+  recent: number;
+  earlier: number;
+}
+
+export interface CategoryShift extends TrendChange {
+  category: string;
+  label: string;
+}
+
+export interface WeeklyMeetingCount {
+  week: string;
+  label: string;
+  count: number;
+  total: number;
+}
+
+export interface WeeklyCategoryHours {
+  week: string;
+  label: string;
+  meeting: number;
+  focus: number;
+  social: number;
+  admin: number;
+  other: number;
+}
+
+export interface TrendsReport {
+  meetingCount: TrendChange;
+  totalHours: TrendChange;
+  avgDuration: TrendChange;
+  categoryShifts: CategoryShift[];
+  topGrowing: CategoryShift | null;
+  busiestDay: string;
+  busiestDayHours: number;
+  weeklyMeetingCounts: WeeklyMeetingCount[];
+  weeklyCategoryHours: WeeklyCategoryHours[];
+  weekCount: number;
+}
+
 export interface AnalyticsReport {
   summary: ReportSummary;
   categoryBreakdown: CategoryBreakdown[];

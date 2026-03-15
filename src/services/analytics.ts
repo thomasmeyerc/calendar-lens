@@ -12,6 +12,11 @@ import type {
   AttendeeInsights,
   Collaborator,
   MeetingSizeBucket,
+  TrendsReport,
+  TrendChange,
+  CategoryShift,
+  WeeklyMeetingCount,
+  WeeklyCategoryHours,
 } from '../types/calendar';
 import { APP_CONFIG } from '../types/calendar';
 
@@ -346,5 +351,147 @@ function computeAttendeeInsights(events: CalendarEvent[]): AttendeeInsights {
     uniquePeople,
     avgAttendees,
     meetingsWithAttendees: eventsWithAttendees.length,
+  };
+}
+
+// === Trends Computation ===
+
+function emptyTrends(): TrendsReport {
+  return {
+    meetingCount: { direction: 'stable', percent: 0, recent: 0, earlier: 0 },
+    totalHours: { direction: 'stable', percent: 0, recent: 0, earlier: 0 },
+    avgDuration: { direction: 'stable', percent: 0, recent: 0, earlier: 0 },
+    categoryShifts: [],
+    topGrowing: null,
+    busiestDay: 'N/A',
+    busiestDayHours: 0,
+    weeklyMeetingCounts: [],
+    weeklyCategoryHours: [],
+    weekCount: 0,
+  };
+}
+
+function computeChange(earlier: number, recent: number): TrendChange {
+  if (earlier === 0 && recent === 0) return { direction: 'stable', percent: 0, recent, earlier };
+  if (earlier === 0) return { direction: 'up', percent: 100, recent: Math.round(recent * 10) / 10, earlier: 0 };
+
+  const pct = Math.round(((recent - earlier) / earlier) * 100);
+  let direction: TrendChange['direction'] = 'stable';
+  if (pct > 5) direction = 'up';
+  else if (pct < -5) direction = 'down';
+
+  return {
+    direction,
+    percent: Math.abs(pct),
+    recent: Math.round(recent * 10) / 10,
+    earlier: Math.round(earlier * 10) / 10,
+  };
+}
+
+function computeWeeklyAverages(weekKeys: string[], buckets: Record<string, CalendarEvent[]>) {
+  let totalMeetings = 0, totalHours = 0, totalDuration = 0, eventCount = 0;
+  const categoryHours: Record<string, number> = {};
+
+  for (const wk of weekKeys) {
+    for (const e of buckets[wk]!) {
+      if (e.category === 'meeting') totalMeetings++;
+      totalHours += e.durationMin / 60;
+      totalDuration += e.durationMin;
+      eventCount++;
+      const cat = e.category || 'other';
+      categoryHours[cat] = (categoryHours[cat] || 0) + e.durationMin / 60;
+    }
+  }
+
+  const n = weekKeys.length;
+  for (const k of Object.keys(categoryHours)) {
+    categoryHours[k] = categoryHours[k]! / n;
+  }
+
+  return {
+    meetingsPerWeek: totalMeetings / n,
+    hoursPerWeek: totalHours / n,
+    avgDuration: eventCount > 0 ? totalDuration / eventCount : 0,
+    categoryHours,
+  };
+}
+
+function formatWeekLabel(weekKey: string): string {
+  const d = new Date(weekKey);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+export function computeTrends(events: CalendarEvent[]): TrendsReport {
+  const timedEvents = events.filter(e => !e.allDay);
+  if (timedEvents.length === 0) return emptyTrends();
+
+  const weekBuckets: Record<string, CalendarEvent[]> = {};
+  for (const event of timedEvents) {
+    const wk = getWeekKey(event.start);
+    if (!weekBuckets[wk]) weekBuckets[wk] = [];
+    weekBuckets[wk]!.push(event);
+  }
+
+  const weekKeys = Object.keys(weekBuckets).sort();
+  if (weekKeys.length < 2) return emptyTrends();
+
+  const mid = Math.ceil(weekKeys.length / 2);
+  const earlierWeeks = weekKeys.slice(0, mid);
+  const recentWeeks = weekKeys.slice(mid);
+
+  const earlierAvg = computeWeeklyAverages(earlierWeeks, weekBuckets);
+  const recentAvg = computeWeeklyAverages(recentWeeks, weekBuckets);
+
+  const meetingCountChange = computeChange(earlierAvg.meetingsPerWeek, recentAvg.meetingsPerWeek);
+  const totalHoursChange = computeChange(earlierAvg.hoursPerWeek, recentAvg.hoursPerWeek);
+  const avgDurationChange = computeChange(earlierAvg.avgDuration, recentAvg.avgDuration);
+
+  // Category shifts
+  const allCats = new Set([...Object.keys(earlierAvg.categoryHours), ...Object.keys(recentAvg.categoryHours)]);
+  const categoryShifts: CategoryShift[] = [];
+  for (const cat of allCats) {
+    const change = computeChange(earlierAvg.categoryHours[cat] || 0, recentAvg.categoryHours[cat] || 0);
+    categoryShifts.push({ category: cat, label: formatCategoryLabel(cat), ...change });
+  }
+  categoryShifts.sort((a, b) => b.percent - a.percent);
+
+  const weeklyMeetingCounts: WeeklyMeetingCount[] = weekKeys.map(wk => ({
+    week: wk,
+    label: formatWeekLabel(wk),
+    count: weekBuckets[wk]!.filter(e => e.category === 'meeting').length,
+    total: weekBuckets[wk]!.length,
+  }));
+
+  const weeklyCategoryHours: WeeklyCategoryHours[] = weekKeys.map(wk => {
+    const cats = { meeting: 0, focus: 0, social: 0, admin: 0, other: 0 };
+    for (const ev of weekBuckets[wk]!) {
+      const cat = (ev.category || 'other') as keyof typeof cats;
+      cats[cat] = (cats[cat] || 0) + ev.durationMin / 60;
+    }
+    for (const k of Object.keys(cats) as (keyof typeof cats)[]) {
+      cats[k] = Math.round(cats[k] * 10) / 10;
+    }
+    return { week: wk, label: formatWeekLabel(wk), ...cats };
+  });
+
+  const dayTotals = [0, 0, 0, 0, 0, 0, 0];
+  for (const event of timedEvents) {
+    const dayIdx = (event.start.getDay() + 6) % 7;
+    dayTotals[dayIdx]! += event.durationMin;
+  }
+  const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const busiestDayIdx = dayTotals.indexOf(Math.max(...dayTotals));
+
+  return {
+    meetingCount: meetingCountChange,
+    totalHours: totalHoursChange,
+    avgDuration: avgDurationChange,
+    categoryShifts,
+    topGrowing: categoryShifts.length > 0 ? categoryShifts[0]! : null,
+    busiestDay: dayNames[busiestDayIdx]!,
+    busiestDayHours: Math.round(dayTotals[busiestDayIdx]! / 60 * 10) / 10,
+    weeklyMeetingCounts,
+    weeklyCategoryHours,
+    weekCount: weekKeys.length,
   };
 }

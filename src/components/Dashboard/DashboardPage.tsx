@@ -1,7 +1,10 @@
+import { useMemo } from 'react';
 import type { AnalyticsReport, CalendarEvent } from '../../types/calendar';
+import { computeTrends } from '../../services/analytics';
 import { StatsRow } from './StatsRow';
 import { DateRangePicker } from './DateRangePicker';
 import { ExportButton } from './ExportButton';
+import { TrendsSection } from './TrendsSection';
 import { TimeAllocation } from '../Charts/TimeAllocation';
 import { DailyBreakdown } from '../Charts/DailyBreakdown';
 import { BusyHeatmap } from '../Charts/BusyHeatmap';
@@ -20,6 +23,8 @@ interface DashboardPageProps {
 }
 
 export function DashboardPage({ report, events, dateRange, onDateRangeApply, onDateRangeReset }: DashboardPageProps) {
+  const trends = useMemo(() => computeTrends(events), [events]);
+
   return (
     <div className="dashboard">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 'var(--space-sm)', marginBottom: 'var(--space-sm)' }}>
@@ -28,6 +33,8 @@ export function DashboardPage({ report, events, dateRange, onDateRangeApply, onD
       </div>
 
       <StatsRow summary={report.summary} />
+
+      <TrendsSection trends={trends} />
 
       <TimeInsights insights={report.insights} />
 
