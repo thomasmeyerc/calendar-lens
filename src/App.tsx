@@ -126,29 +126,20 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>(() => events.length > 0 ? 'dashboard' : 'auth');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Navigate to picker after auth
-  const handleSignIn = useCallback(async () => {
+  // Navigate to picker after auth (redirect flow - navigates away from page)
+  const handleSignIn = useCallback(() => {
     setAuthError(null);
-    const result = await signIn();
-    if (!result.success) {
-      if (result.error) setAuthError(result.error);
-      return;
-    }
-    const token = localStorage.getItem('calendarlens-google-token');
-    if (token) {
-      await loadCalendars(token);
-      setScreen('picker');
-    }
-  }, [signIn, loadCalendars, setAuthError]);
+    signIn();
+  }, [signIn, setAuthError]);
 
-  const handleSignOut = useCallback(async () => {
-    await signOut();
+  const handleSignOut = useCallback(() => {
+    signOut();
     setScreen('auth');
   }, [signOut]);
 
   const handleSync = useCallback(async () => {
     if (!accessToken || isTokenExpired()) {
-      await signIn();
+      signIn();
       return;
     }
     await loadCalendars(accessToken);
@@ -246,7 +237,7 @@ export default function App() {
           error={error}
           onAnalyze={handleAnalyze}
           onRetry={handleSync}
-          onReAuth={async () => { await signOut(); await signIn(); }}
+          onReAuth={() => { signOut(); signIn(); }}
         />
       )}
 

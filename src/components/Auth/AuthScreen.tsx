@@ -28,11 +28,7 @@ export function AuthScreen({ onSignIn, onOfflineMode, isConfigured, error }: Aut
           <p className="auth-subtitle">Connect your Google Calendar or upload an .ics file to visualize patterns and gain insights.</p>
         </div>
 
-        {error && (
-          <p style={{ color: 'var(--color-rose)', fontSize: '0.875rem', marginBottom: 'var(--space-sm)', textAlign: 'center' }}>
-            {error}
-          </p>
-        )}
+        {error && <p className="auth-error" style={{ color: 'var(--color-error, #dc3545)', marginBottom: '1rem', fontSize: '0.9rem' }}>{error}</p>}
 
         {isConfigured && <GoogleSignInButton onClick={onSignIn} />}
         {!isConfigured && <p className="auth-hint">Google sign-in not configured. Use offline mode.</p>}
