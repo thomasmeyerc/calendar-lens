@@ -5,6 +5,16 @@ interface EventsTableProps {
   totalCount: number;
 }
 
+function formatAttendees(event: CalendarEvent): string {
+  if (!event.attendees || event.attendees.length === 0) return '-';
+  const others = event.attendees.filter(a => !a.self);
+  if (others.length === 0) return 'Just you';
+  const names = others.slice(0, 3).map(a => (a.name || a.email).split(' ')[0] ?? a.email.split('@')[0]);
+  let text = names.join(', ');
+  if (others.length > 3) text += ` +${others.length - 3}`;
+  return text;
+}
+
 function formatDuration(event: CalendarEvent): string {
   if (event.allDay) return 'All day';
   if (event.durationMin >= 60) {
@@ -30,6 +40,7 @@ export function EventsTable({ events, totalCount }: EventsTableProps) {
               <th>Event</th>
               <th>Date & Time</th>
               <th>Duration</th>
+              <th>Attendees</th>
               <th>Category</th>
             </tr>
           </thead>
@@ -39,6 +50,7 @@ export function EventsTable({ events, totalCount }: EventsTableProps) {
                 <td>{event.summary}</td>
                 <td>{event.start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
                 <td>{formatDuration(event)}</td>
+                <td>{formatAttendees(event)}</td>
                 <td>
                   <span className={`category-dot cat-${event.category}`}>
                     {event.category.charAt(0).toUpperCase() + event.category.slice(1)}

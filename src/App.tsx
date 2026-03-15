@@ -8,9 +8,34 @@ import { AuthScreen } from './components/Auth/AuthScreen';
 import { CalendarPicker } from './components/Picker/CalendarPicker';
 import { UploadScreen } from './components/Upload/UploadScreen';
 import { DashboardPage } from './components/Dashboard/DashboardPage';
-import type { CalendarEvent } from './types/calendar';
+import type { Attendee, CalendarEvent } from './types/calendar';
 
 type Screen = 'auth' | 'picker' | 'upload' | 'dashboard';
+
+const SAMPLE_PEOPLE = [
+  { name: 'Sarah Chen', email: 'sarah.chen@company.com' },
+  { name: 'James Wilson', email: 'james.wilson@company.com' },
+  { name: 'Maria Garcia', email: 'maria.garcia@company.com' },
+  { name: 'Alex Kim', email: 'alex.kim@company.com' },
+  { name: 'David Brown', email: 'david.brown@company.com' },
+  { name: 'Emma Taylor', email: 'emma.taylor@company.com' },
+  { name: 'Ryan Patel', email: 'ryan.patel@company.com' },
+  { name: 'Lisa Johnson', email: 'lisa.johnson@company.com' },
+  { name: 'Mike Davis', email: 'mike.davis@company.com' },
+  { name: 'Nina Sharma', email: 'nina.sharma@company.com' },
+  { name: 'Tom Martinez', email: 'tom.martinez@company.com' },
+  { name: 'Olivia Lee', email: 'olivia.lee@company.com' },
+];
+
+function pickAttendees(seed: number, count: number): Attendee[] {
+  const result: Attendee[] = [{ name: 'You', email: 'me@company.com', self: true, organizer: false, status: 'accepted' }];
+  for (let i = 0; i < count; i++) {
+    const idx = (seed + i * 7) % SAMPLE_PEOPLE.length;
+    const p = SAMPLE_PEOPLE[idx]!;
+    result.push({ name: p.name, email: p.email, self: false, organizer: i === 0, status: 'accepted' });
+  }
+  return result;
+}
 
 function generateSampleEvents(): CalendarEvent[] {
   const events: CalendarEvent[] = [];
@@ -18,26 +43,26 @@ function generateSampleEvents(): CalendarEvent[] {
   const baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   const templates = [
-    { summary: 'Daily Stand-up', hour: 9, duration: 15, category: 'meeting' as const, freq: 'daily' },
-    { summary: 'Sprint Planning', hour: 10, duration: 60, category: 'meeting' as const, freq: 'biweekly' },
-    { summary: 'Team Sync', hour: 14, duration: 30, category: 'meeting' as const, freq: 'weekly' },
-    { summary: '1:1 with Manager', hour: 11, duration: 30, category: 'meeting' as const, freq: 'weekly' },
-    { summary: 'Code Review Session', hour: 15, duration: 45, category: 'focus' as const, freq: 'triweekly' },
-    { summary: 'Deep Work Block', hour: 10, duration: 120, category: 'focus' as const, freq: 'daily' },
-    { summary: 'Design Review', hour: 13, duration: 45, category: 'meeting' as const, freq: 'weekly' },
-    { summary: 'Sprint Retro', hour: 16, duration: 60, category: 'meeting' as const, freq: 'biweekly' },
-    { summary: 'Lunch with Team', hour: 12, duration: 60, category: 'social' as const, freq: 'weekly' },
-    { summary: 'Coffee Chat', hour: 15, duration: 30, category: 'social' as const, freq: 'biweekly' },
-    { summary: 'All Hands Meeting', hour: 11, duration: 60, category: 'meeting' as const, freq: 'monthly' },
-    { summary: 'Training Session', hour: 14, duration: 90, category: 'admin' as const, freq: 'monthly' },
-    { summary: 'Expense Report', hour: 16, duration: 30, category: 'admin' as const, freq: 'monthly' },
-    { summary: 'Brainstorm Session', hour: 10, duration: 60, category: 'meeting' as const, freq: 'biweekly' },
-    { summary: 'Product Demo', hour: 15, duration: 45, category: 'meeting' as const, freq: 'biweekly' },
-    { summary: 'Writing Documentation', hour: 14, duration: 60, category: 'focus' as const, freq: 'weekly' },
-    { summary: 'Interview - Candidate', hour: 11, duration: 60, category: 'meeting' as const, freq: 'triweekly' },
-    { summary: 'Happy Hour', hour: 17, duration: 60, category: 'social' as const, freq: 'monthly' },
-    { summary: 'Research Time', hour: 9, duration: 90, category: 'focus' as const, freq: 'biweekly' },
-    { summary: 'Cross-team Sync', hour: 13, duration: 30, category: 'meeting' as const, freq: 'weekly' },
+    { summary: 'Daily Stand-up', hour: 9, duration: 15, category: 'meeting' as const, freq: 'daily', attendeeCount: 5 },
+    { summary: 'Sprint Planning', hour: 10, duration: 60, category: 'meeting' as const, freq: 'biweekly', attendeeCount: 8 },
+    { summary: 'Team Sync', hour: 14, duration: 30, category: 'meeting' as const, freq: 'weekly', attendeeCount: 4 },
+    { summary: '1:1 with Manager', hour: 11, duration: 30, category: 'meeting' as const, freq: 'weekly', attendeeCount: 1 },
+    { summary: 'Code Review Session', hour: 15, duration: 45, category: 'focus' as const, freq: 'triweekly', attendeeCount: 2 },
+    { summary: 'Deep Work Block', hour: 10, duration: 120, category: 'focus' as const, freq: 'daily', attendeeCount: 0 },
+    { summary: 'Design Review', hour: 13, duration: 45, category: 'meeting' as const, freq: 'weekly', attendeeCount: 3 },
+    { summary: 'Sprint Retro', hour: 16, duration: 60, category: 'meeting' as const, freq: 'biweekly', attendeeCount: 7 },
+    { summary: 'Lunch with Team', hour: 12, duration: 60, category: 'social' as const, freq: 'weekly', attendeeCount: 3 },
+    { summary: 'Coffee Chat', hour: 15, duration: 30, category: 'social' as const, freq: 'biweekly', attendeeCount: 1 },
+    { summary: 'All Hands Meeting', hour: 11, duration: 60, category: 'meeting' as const, freq: 'monthly', attendeeCount: 11 },
+    { summary: 'Training Session', hour: 14, duration: 90, category: 'admin' as const, freq: 'monthly', attendeeCount: 6 },
+    { summary: 'Expense Report', hour: 16, duration: 30, category: 'admin' as const, freq: 'monthly', attendeeCount: 0 },
+    { summary: 'Brainstorm Session', hour: 10, duration: 60, category: 'meeting' as const, freq: 'biweekly', attendeeCount: 4 },
+    { summary: 'Product Demo', hour: 15, duration: 45, category: 'meeting' as const, freq: 'biweekly', attendeeCount: 9 },
+    { summary: 'Writing Documentation', hour: 14, duration: 60, category: 'focus' as const, freq: 'weekly', attendeeCount: 0 },
+    { summary: 'Interview - Candidate', hour: 11, duration: 60, category: 'meeting' as const, freq: 'triweekly', attendeeCount: 2 },
+    { summary: 'Happy Hour', hour: 17, duration: 60, category: 'social' as const, freq: 'monthly', attendeeCount: 8 },
+    { summary: 'Research Time', hour: 9, duration: 90, category: 'focus' as const, freq: 'biweekly', attendeeCount: 0 },
+    { summary: 'Cross-team Sync', hour: 13, duration: 30, category: 'meeting' as const, freq: 'weekly', attendeeCount: 5 },
   ];
 
   function hashStr(str: string): number {
@@ -72,11 +97,17 @@ function generateSampleEvents(): CalendarEvent[] {
           const start = new Date(day);
           start.setHours(template.hour, startMin, 0, 0);
           const end = new Date(start.getTime() + template.duration * 60000);
+          const attendees = template.attendeeCount > 0
+            ? pickAttendees(hashStr(template.summary) + weekOffset, template.attendeeCount)
+            : [];
           events.push({
             summary: template.summary, start, end,
             durationMin: template.duration, allDay: false,
             description: '', location: '', categories: [],
             status: 'CONFIRMED', category: template.category,
+            attendees,
+            attendeeCount: attendees.length,
+            organizer: null,
           });
         }
       }

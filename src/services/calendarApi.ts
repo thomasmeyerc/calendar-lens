@@ -79,6 +79,14 @@ export async function listCalendars(accessToken: string): Promise<GoogleCalendar
   }));
 }
 
+interface GoogleCalendarAttendee {
+  email?: string;
+  displayName?: string;
+  self?: boolean;
+  organizer?: boolean;
+  responseStatus?: string;
+}
+
 interface GoogleCalendarEvent {
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
@@ -86,6 +94,8 @@ interface GoogleCalendarEvent {
   description?: string;
   location?: string;
   status?: string;
+  attendees?: GoogleCalendarAttendee[];
+  organizer?: { email?: string; displayName?: string };
 }
 
 interface GoogleCalendarListEntry {
@@ -109,6 +119,18 @@ function convertEvent(gcalEvent: GoogleCalendarEvent): CalendarEvent | null {
   const durationMin = allDay ? 0 : Math.round((end.getTime() - start.getTime()) / 60000);
   const summary = gcalEvent.summary ?? '(No Title)';
 
+  const rawAttendees = gcalEvent.attendees ?? [];
+  const attendees = rawAttendees.map(a => ({
+    email: a.email ?? '',
+    name: a.displayName ?? a.email ?? '',
+    self: a.self ?? false,
+    organizer: a.organizer ?? false,
+    status: a.responseStatus ?? 'needsAction',
+  }));
+  const organizer = gcalEvent.organizer
+    ? { email: gcalEvent.organizer.email ?? '', name: gcalEvent.organizer.displayName ?? gcalEvent.organizer.email ?? '' }
+    : null;
+
   return {
     summary,
     start,
@@ -120,5 +142,8 @@ function convertEvent(gcalEvent: GoogleCalendarEvent): CalendarEvent | null {
     categories: [],
     status: gcalEvent.status ?? 'confirmed',
     category: categorize(summary),
+    attendees,
+    attendeeCount: attendees.length,
+    organizer,
   };
 }
