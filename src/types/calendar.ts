@@ -62,6 +62,15 @@ export interface DurationBucket {
   count: number;
 }
 
+export type InsightIcon = 'calendar' | 'clock' | 'zap' | 'repeat' | 'sun';
+export type InsightColor = 'indigo' | 'blue' | 'teal' | 'rose' | 'amber';
+
+export interface Insight {
+  icon: InsightIcon;
+  color: InsightColor;
+  text: string;
+}
+
 export interface AnalyticsReport {
   summary: ReportSummary;
   categoryBreakdown: CategoryBreakdown[];
@@ -69,6 +78,7 @@ export interface AnalyticsReport {
   weeklyTrend: WeeklyTrend[];
   heatmap: HeatmapData;
   durationDistribution: DurationBucket[];
+  insights: Insight[];
   recentEvents: CalendarEvent[];
   dateRange: { start: Date; end: Date };
 }

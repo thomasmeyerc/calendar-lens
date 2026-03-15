@@ -8,6 +8,7 @@ import { BusyHeatmap } from '../Charts/BusyHeatmap';
 import { WeeklyTrend } from '../Charts/WeeklyTrend';
 import { DurationDistribution } from '../Charts/DurationDistribution';
 import { EventsTable } from '../Events/EventsTable';
+import { TimeInsights } from './TimeInsights';
 
 interface DashboardPageProps {
   report: AnalyticsReport;
@@ -26,6 +27,8 @@ export function DashboardPage({ report, events, dateRange, onDateRangeApply, onD
       </div>
 
       <StatsRow summary={report.summary} />
+
+      <TimeInsights insights={report.insights} />
 
       <div className="charts-grid">
         <TimeAllocation data={report.categoryBreakdown} />

@@ -816,6 +816,93 @@ body {
     margin-top: 2px;
 }
 
+/* === Insights === */
+.insights-card {
+    background: var(--bg-card);
+    border: 1px solid var(--bg-card-border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-xl);
+    overflow: hidden;
+    animation: fadeInUp 0.4s var(--ease-out) both;
+    animation-delay: 0.25s;
+}
+
+.insights-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+}
+
+.insight-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--bg-card-border);
+    transition: background var(--transition-fast);
+}
+
+.insight-item:last-child {
+    border-bottom: none;
+}
+
+.insight-item:hover {
+    background: var(--bg-card-hover);
+}
+
+.insight-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.insight-icon-indigo {
+    background: rgba(99, 102, 241, 0.1);
+    color: var(--accent);
+}
+
+.insight-icon-blue {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--blue);
+}
+
+.insight-icon-teal {
+    background: rgba(20, 184, 166, 0.1);
+    color: var(--teal);
+}
+
+.insight-icon-rose {
+    background: rgba(244, 63, 94, 0.1);
+    color: var(--rose);
+}
+
+.insight-icon-amber {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--amber);
+}
+
+.insight-text {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    padding: var(--space-xs) 0;
+}
+
+@media (max-width: 640px) {
+    .insight-item {
+        padding: var(--space-sm) var(--space-md);
+    }
+
+    .insight-text {
+        font-size: 0.8125rem;
+    }
+}
+
 /* === Charts === */
 .charts-grid {
     display: grid;
