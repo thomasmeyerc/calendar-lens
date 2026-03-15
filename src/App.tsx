@@ -129,7 +129,13 @@ export default function App() {
   // Navigate to picker after auth
   const handleSignIn = useCallback(async () => {
     await signIn();
-  }, [signIn]);
+    // After sign-in completes, navigate to picker
+    const token = localStorage.getItem('calendarlens-google-token');
+    if (token) {
+      await loadCalendars(token);
+      setScreen('picker');
+    }
+  }, [signIn, loadCalendars]);
 
   const handleSignOut = useCallback(async () => {
     await signOut();
@@ -170,9 +176,9 @@ export default function App() {
     setScreen('dashboard');
   }, [setEvents]);
 
-  // Handle post-OAuth redirect
+  // Handle post-OAuth redirect (e.g. returning with a saved token)
   useEffect(() => {
-    if (!authLoading && user && accessToken && screen === 'auth') {
+    if (!authLoading && accessToken && screen === 'auth') {
       if (events.length > 0) {
         setScreen('dashboard');
       } else {
@@ -180,7 +186,7 @@ export default function App() {
         setScreen('picker');
       }
     }
-  }, [authLoading, user, accessToken, screen, events.length, loadCalendars]);
+  }, [authLoading, accessToken, screen, events.length, loadCalendars]);
 
   if (authLoading) {
     return (
