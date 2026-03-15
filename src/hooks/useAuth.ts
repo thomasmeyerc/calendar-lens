@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { GOOGLE_CLIENT_ID, GOOGLE_CALENDAR_SCOPES, isConfigured } from '../services/supabase';
+import { GOOGLE_CLIENT_ID, GOOGLE_CALENDAR_SCOPES, isConfigured } from '../services/config';
 
 const TOKEN_KEY = 'calendarlens-google-token';
 const TOKEN_TS_KEY = 'calendarlens-google-token-ts';
@@ -71,10 +71,26 @@ async function fetchUserInfo(accessToken: string): Promise<GoogleUserInfo> {
   return res.json() as Promise<GoogleUserInfo>;
 }
 
+function getSavedToken(): string | null {
+  const savedToken = localStorage.getItem(TOKEN_KEY);
+  const savedTs = localStorage.getItem(TOKEN_TS_KEY);
+  if (savedToken && savedTs && (Date.now() - parseInt(savedTs, 10)) < TOKEN_EXPIRY_MS) {
+    return savedToken;
+  }
+  // Clean up expired tokens
+  if (savedToken) {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_TS_KEY);
+  }
+  return null;
+}
+
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(() => getSavedToken());
   const [loading, setLoading] = useState(true);
   const tokenClientRef = useRef<TokenClient | null>(null);
+  const signInResolveRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!isConfigured()) {
@@ -82,25 +98,18 @@ export function useAuth() {
       return;
     }
 
-    const savedToken = localStorage.getItem(TOKEN_KEY);
-    const savedTs = localStorage.getItem(TOKEN_TS_KEY);
-    const tokenValid = savedToken && savedTs && (Date.now() - parseInt(savedTs, 10)) < TOKEN_EXPIRY_MS;
-
-    if (tokenValid && savedToken) {
-      fetchUserInfo(savedToken)
+    if (accessToken) {
+      fetchUserInfo(accessToken)
         .then(info => {
           setUser({ id: info.sub, email: info.email, name: info.name, avatar: info.picture ?? null });
         })
         .catch(() => {
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(TOKEN_TS_KEY);
+          setAccessToken(null);
         })
         .finally(() => setLoading(false));
     } else {
-      if (savedToken) {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(TOKEN_TS_KEY);
-      }
       setLoading(false);
     }
 
@@ -110,22 +119,38 @@ export function useAuth() {
         client_id: GOOGLE_CLIENT_ID,
         scope: GOOGLE_CALENDAR_SCOPES + ' openid email profile',
         callback: async (response: TokenResponse) => {
-          if (response.error) return;
+          if (response.error) {
+            signInResolveRef.current?.();
+            signInResolveRef.current = null;
+            return;
+          }
           localStorage.setItem(TOKEN_KEY, response.access_token);
           localStorage.setItem(TOKEN_TS_KEY, Date.now().toString());
+          setAccessToken(response.access_token);
           try {
             const info = await fetchUserInfo(response.access_token);
             setUser({ id: info.sub, email: info.email, name: info.name, avatar: info.picture ?? null });
           } catch {
             // Token is valid even if userinfo fails
           }
+          signInResolveRef.current?.();
+          signInResolveRef.current = null;
         },
       });
     });
+  // Run only on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const signIn = useCallback(() => {
-    tokenClientRef.current?.requestAccessToken({ prompt: 'consent' });
+  const signIn = useCallback((): Promise<void> => {
+    return new Promise<void>((resolve) => {
+      if (!tokenClientRef.current) {
+        resolve();
+        return;
+      }
+      signInResolveRef.current = resolve;
+      tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
+    });
   }, []);
 
   const signOut = useCallback(() => {
@@ -135,10 +160,9 @@ export function useAuth() {
     }
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(TOKEN_TS_KEY);
+    setAccessToken(null);
     setUser(null);
   }, []);
-
-  const accessToken = localStorage.getItem(TOKEN_KEY);
 
   const isTokenExpired = useCallback((): boolean => {
     const ts = localStorage.getItem(TOKEN_TS_KEY);

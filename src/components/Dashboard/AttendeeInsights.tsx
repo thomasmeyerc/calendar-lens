@@ -1,41 +1,21 @@
 import { useRef, useEffect } from 'react';
 import type { AttendeeInsights as AttendeeInsightsData } from '../../types/calendar';
 import Chart from 'chart.js/auto';
+import { tooltipStyle, gridColor, CHART_BG, CHART_COLORS } from '../Charts/chartConfig';
 
 interface AttendeeInsightsProps {
   data: AttendeeInsightsData;
 }
 
-function isDark(): boolean {
-  return document.documentElement.getAttribute('data-theme') === 'dark';
-}
-
-function tooltipStyle() {
-  return {
-    backgroundColor: isDark() ? 'rgba(15, 15, 26, 0.95)' : 'rgba(15, 23, 42, 0.95)',
-    titleColor: '#fff',
-    bodyColor: '#e2e8f0',
-    borderColor: isDark() ? 'rgba(129, 140, 248, 0.2)' : 'rgba(0, 0, 0, 0.1)',
-    borderWidth: 1,
-    padding: 12,
-    cornerRadius: 8,
-  };
-}
-
-function gridColor(): string {
-  return isDark() ? 'rgba(130, 140, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)';
-}
-
-const CHART_BG = [
-  'rgba(129,140,248,0.8)', 'rgba(45,212,191,0.8)', 'rgba(251,113,133,0.8)',
-  'rgba(251,191,36,0.8)', 'rgba(96,165,250,0.8)', 'rgba(192,132,252,0.8)',
+const EXTENDED_BG = [
+  ...CHART_BG,
   'rgba(52,211,153,0.8)', 'rgba(244,114,182,0.8)', 'rgba(167,139,250,0.8)',
   'rgba(56,189,248,0.8)',
 ];
 
-const CHART_BORDERS = [
-  '#818cf8', '#2dd4bf', '#fb7185', '#fbbf24', '#60a5fa',
-  '#c084fc', '#34d399', '#f472b6', '#a78bfa', '#38bdf8',
+const EXTENDED_BORDERS = [
+  ...CHART_COLORS,
+  '#34d399', '#f472b6', '#a78bfa', '#38bdf8',
 ];
 
 export function AttendeeInsights({ data }: AttendeeInsightsProps) {
@@ -58,8 +38,8 @@ export function AttendeeInsights({ data }: AttendeeInsightsProps) {
           datasets: [{
             label: 'Meetings',
             data: data.topCollaborators.map(c => c.count),
-            backgroundColor: CHART_BG.slice(0, data.topCollaborators.length),
-            borderColor: CHART_BORDERS.slice(0, data.topCollaborators.length),
+            backgroundColor: EXTENDED_BG.slice(0, data.topCollaborators.length),
+            borderColor: EXTENDED_BORDERS.slice(0, data.topCollaborators.length),
             borderWidth: 1,
             borderRadius: 6,
             borderSkipped: false,
