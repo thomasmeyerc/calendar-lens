@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GOOGLE_CLIENT_ID, GOOGLE_CALENDAR_SCOPES, isConfigured } from '../services/config';
+import { GOOGLE_CLIENT_ID, GOOGLE_CALENDAR_SCOPES, isConfigured, getConfigError } from '../services/config';
 
 const TOKEN_KEY = 'calendarlens-google-token';
 const TOKEN_TS_KEY = 'calendarlens-google-token-ts';
@@ -202,6 +202,7 @@ export function useAuth() {
     error,
     isAuthenticated: user !== null,
     isConfigured: isConfigured(),
+    configError: getConfigError(),
     signIn,
     signOut,
     setError,

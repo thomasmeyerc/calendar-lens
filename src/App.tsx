@@ -118,7 +118,7 @@ function generateSampleEvents(): CalendarEvent[] {
 }
 
 export default function App() {
-  const { user, loading: authLoading, accessToken, error: authError, isConfigured, signIn, signOut, setError: setAuthError, isTokenExpired } = useAuth();
+  const { user, loading: authLoading, accessToken, error: authError, isConfigured, configError, signIn, signOut, setError: setAuthError, isTokenExpired } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const { calendars, events, loading: calLoading, error, loadCalendars, loadEvents, importICS, setEvents } = useCalendar();
   const { report, dateRange, setDateRange, resetDateRange } = useAnalytics(events);
@@ -226,6 +226,7 @@ export default function App() {
           onSignIn={handleSignIn}
           onOfflineMode={() => setScreen('upload')}
           isConfigured={isConfigured}
+          configError={configError}
           error={authError}
         />
       )}
