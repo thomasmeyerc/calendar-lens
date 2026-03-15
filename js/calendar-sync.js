@@ -55,7 +55,12 @@ const CalendarSync = (function () {
         });
 
         if (!response.ok) {
-            throw new Error(`Calendar list error: ${response.status}`);
+            const body = await response.json().catch(() => ({}));
+            const msg = body?.error?.message || `HTTP ${response.status}`;
+            const err = new Error(msg);
+            err.status = response.status;
+            err.details = body;
+            throw err;
         }
 
         const data = await response.json();

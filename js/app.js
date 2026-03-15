@@ -215,7 +215,30 @@
             btnPickerAnalyze.disabled = selectedCalendarIds.length === 0;
         } catch (err) {
             console.error('Failed to load calendars:', err);
-            pickerList.innerHTML = '<div class="picker-loading">Failed to load calendars. Try again.</div>';
+
+            let hint = '';
+            if (err.status === 403 || (err.message && err.message.includes('not enabled'))) {
+                hint = 'The Google Calendar API may not be enabled. Go to Google Cloud Console &rarr; APIs &amp; Services &rarr; Enable "Google Calendar API".';
+            } else if (err.status === 401 || err.message === 'UNAUTHORIZED') {
+                hint = 'Calendar access was not granted. Please sign in again and check the calendar permission checkbox.';
+            } else {
+                hint = err.message || 'Unknown error';
+            }
+
+            pickerList.innerHTML = `
+                <div class="picker-loading" style="line-height:1.7">
+                    <p style="margin-bottom:12px"><strong>Could not load calendars</strong></p>
+                    <p style="font-size:0.8125rem;max-width:360px;margin:0 auto 16px">${hint}</p>
+                    <button class="btn btn-secondary btn-sm" id="btn-picker-retry">Try again</button>
+                    <button class="btn btn-ghost btn-sm" id="btn-picker-reauth" style="margin-left:8px">Re-sign in</button>
+                </div>
+            `;
+
+            document.getElementById('btn-picker-retry')?.addEventListener('click', showPickerScreen);
+            document.getElementById('btn-picker-reauth')?.addEventListener('click', async () => {
+                await Auth.signOut();
+                Auth.signInWithGoogle();
+            });
         }
     }
 
